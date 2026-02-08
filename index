@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小红书封面生成 - Karpathy笔记法</title>
+    <!-- 引入谷歌字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <!-- 引入Font Awesome图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2canvas库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #ff2e63;
+            --secondary-color: #08d9d6;
+            --bg-color: #f8f9fa;
+            --text-dark: #252a34;
+            --text-light: #eaeaea;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+        
+        body {
+            background-color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        /* 控制按钮样式 */
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button:hover {
+            background-color: #e62758;
+            transform: translateY(-2px);
+        }
+        
+        /* 核心画布样式 - 严格3:4比例 */
+        #canvas {
+            width: 600px; /* 基础宽度，可根据需要调整 */
+            height: 800px; /* 3:4 比例 */
+            background: linear-gradient(135deg, #fdf2f8 0%, #fef7fb 100%);
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        
+        /* 封面内容容器 */
+        .cover-content {
+            width: 100%;
+            height: 100%;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: var(--text-dark);
+        }
+        
+        /* 标题区域 */
+        .title-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .main-title {
+            font-size: 68px; /* 主标题字号最大 */
+            font-weight: 900;
+            line-height: 1.2;
+            position: relative;
+        }
+        
+        /* 关键词特殊处理 - 描边+高亮 */
+        .keyword {
+            color: var(--primary-color);
+            -webkit-text-stroke: 1px var(--text-dark);
+            text-shadow: 2px 2px 0 rgba(255, 46, 99, 0.2);
+        }
+        
+        .sub-title {
+            font-size: 24px; /* 副标题字号 */
+            font-weight: 700;
+            color: #444;
+            margin-top: 10px;
+        }
+        
+        /* 内容区域 */
+        .content-section {
+            font-size: 20px; /* 介绍文字字号 */
+            line-height: 1.6;
+            color: #555;
+            font-weight: 400;
+            margin: 20px 0;
+        }
+        
+        /* 标签样式 */
+        .tag {
+            display: inline-block;
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 16px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        /* 底部信息 */
+        .footer-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        
+        .account {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .slogan {
+            font-size: 18px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        /* 装饰元素 */
+        .decor-element {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: rgba(255, 46, 99, 0.05);
+            z-index: 0;
+            right: -50px;
+            bottom: -50px;
+        }
+        
+        /* 所有内容层都要高于装饰元素 */
+        .title-section, .content-section, .footer-section {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- 控制按钮 -->
+    <div class="controls">
+        <button id="saveBtn">
+            <i class="fas fa-download"></i> 保存封面图片
+        </button>
+    </div>
+    
+    <!-- 核心画布 - 3:4比例 -->
+    <div id="canvas">
+        <!-- 装饰元素 -->
+        <div class="decor-element"></div>
+        
+        <!-- 封面内容 -->
+        <div class="cover-content">
+            <!-- 标题区域 -->
+            <div class="title-section">
+                <div class="main-title">
+                    Karpathy的<span class="keyword">极简笔记法</span>
+                </div>
+                <div class="sub-title">
+                    一个文件搞定所有日常笔记 📝
+                </div>
+            </div>
+            
+            <!-- 内容区域 -->
+            <div class="content-section">
+                日常笔记只用一个文件<br>
+                新内容置顶 | 用标签分类 | 定期回顾打捞<br>
+                <div style="margin-top: 15px;">
+                    <span class="tag">watch:</span>
+                    <span class="tag">listen:</span>
+                    <span class="tag">read:</span>
+                </div>
+            </div>
+            
+            <!-- 底部区域 -->
+            <div class="footer-section">
+                <div class="account">雄漂</div>
+                <div class="slogan">正儿八经学AI</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 保存图片功能
+        document.getElementById('saveBtn').addEventListener('click', function() {
+            // 获取画布元素
+            const canvasElement = document.getElementById('canvas');
+            
+            // 使用html2canvas生成图片
+            html2canvas(canvasElement, {
+                scale: 2, // 2倍分辨率，保证图片清晰
+                useCORS: true, // 允许跨域资源
+                backgroundColor: '#ffffff', // 背景色
+                logging: false
+            }).then(canvas => {
+                // 创建下载链接
+                const link = document.createElement('a');
+                link.download = '小红书封面-Karpathy笔记法.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                // 提示成功
+                alert('封面图片已成功保存！');
+            }).catch(error => {
+                console.error('保存图片失败:', error);
+                alert('保存图片失败，请重试！');
+            });
+        });
+    </script>
+</body>
+</html>
